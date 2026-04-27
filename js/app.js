@@ -560,6 +560,20 @@ class CommandManager {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  safeReferenceUrl(url) {
+    if (!url) return null;
+    try {
+      const base = (typeof window !== "undefined" && window.location && window.location.href) || "https://commandmgr.local/";
+      const parsed = new URL(url, base);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        return parsed.href;
+      }
+    } catch (e) {
+      return null;
+    }
+    return null;
+  }
+
   // ==================== DATA PERSISTENCE (PROFILE-SCOPED) ====================
 
   // Load lists from localStorage
@@ -1154,46 +1168,7 @@ class CommandManager {
 
     const activeCmd = this.getActiveCommand();
     const placeholders = this.extractPlaceholders(activeCmd);
-
-    // Variation tabs
     const hasVariations = this.selectedCommand.variations && this.selectedCommand.variations.length > 0;
-    const variationTabs = hasVariations
-      ? `<div class="variation-tabs">
-           <button class="variation-tab${this.activeVariation === 0 ? " active" : ""}" data-variation="0">Default</button>
-           ${this.selectedCommand.variations.map((v, i) =>
-             `<button class="variation-tab${this.activeVariation === i + 1 ? " active" : ""}" data-variation="${i + 1}">${v.label}</button>`
-           ).join("")}
-         </div>`
-      : "";
-
-    // Platform information
-    const platformIcon = this.getPlatformIcon(this.selectedCommand.platform);
-    const platformName = this.getPlatformName(this.selectedCommand.platform);
-    const platformInfo = this.selectedCommand.platform
-      ? `<div class="platform-info">
-           <span class="platform-icon">${platformIcon}</span>
-           <span class="platform-name">${platformName}</span>
-         </div>`
-      : '';
-
-    // References section
-    const referencesSection = this.selectedCommand.references && this.selectedCommand.references.length > 0
-      ? `<div class="references-section">
-           <div class="section-title">📚 References & Documentation</div>
-           <div class="references-list">
-             ${this.selectedCommand.references.map(ref =>
-               `<a href="${ref.url}" target="_blank" class="reference-link">
-                  <span class="reference-title">${ref.title}</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="external-link-icon">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                    <polyline points="15,3 21,3 21,9"/>
-                    <line x1="10" y1="14" x2="21" y2="3"/>
-                  </svg>
-                </a>`
-             ).join('')}
-           </div>
-         </div>`
-      : '';
 
     // Requires & protocols badges for builder (use variation-specific requires if active)
     let activeRequires = this.selectedCommand.requires || [];
@@ -1201,75 +1176,199 @@ class CommandManager {
       const activeVar = this.selectedCommand.variations[this.activeVariation - 1];
       if (activeVar.requires) activeRequires = [activeVar.requires];
     }
-    const reqBadges = activeRequires
-      .map((r) => `<span class="badge badge-requires">${r}</span>`)
-      .join("");
-    const protBadges = (this.selectedCommand.protocols || [])
-      .map((p) => `<span class="badge badge-protocol">${p}</span>`)
-      .join("");
-    const badgesRow = (reqBadges || protBadges)
-      ? `<div class="builder-badges">${reqBadges}${protBadges}</div>`
-      : "";
 
-    // Command links section
-    const commandLinksSection = this.getCommandLinksForCommand(this.selectedCommand.id)
+    container.innerHTML = "";
 
-    container.innerHTML = `
-            <div class="command-info">
-                <div class="command-header-section">
-                    <div class="command-title">${this.selectedCommand.name}</div>
-                    ${platformInfo}
-                </div>
-                <div class="command-description">${
-                  this.selectedCommand.description
-                }</div>
-                ${badgesRow}
-            </div>
+    const commandInfo = document.createElement("div");
+    commandInfo.className = "command-info";
 
-            ${variationTabs}
+    const headerSection = document.createElement("div");
+    headerSection.className = "command-header-section";
 
-            ${
-              placeholders.length > 0
-                ? `
-                <div class="parameter-section">
-                    <div class="section-title">Parameters</div>
-                    <div class="parameter-grid">
-                        ${placeholders
-                          .map(
-                            (placeholder) => `
-                            <div class="parameter-group">
-                                <label class="parameter-label">${placeholder}</label>
-                                <div class="dropdown-container">
-                                    <input type="text"
-                                           class="parameter-input"
-                                           id="param-${placeholder}"
-                                           placeholder="Enter ${placeholder}..."
-                                           data-placeholder="${placeholder}">
-                                    <div class="dropdown-list" id="dropdown-${placeholder}"></div>
-                                </div>
-                            </div>
-                        `
-                          )
-                          .join("")}
-                    </div>
-                </div>
-            `
-                : ""
-            }
+    const titleEl = document.createElement("div");
+    titleEl.className = "command-title";
+    titleEl.textContent = this.selectedCommand.name || "";
+    headerSection.appendChild(titleEl);
 
-            <div class="output-section">
-                <div class="output-header">
-                    <span class="output-title">Generated Command</span>
-                    <button class="copy-btn" id="copy-command-btn">Copy</button>
-                </div>
-                <div class="command-output" id="command-output">${
-                  activeCmd
-                }</div>
-            </div>
+    if (this.selectedCommand.platform) {
+      const platformInfo = document.createElement("div");
+      platformInfo.className = "platform-info";
 
-            ${referencesSection}
-            ${commandLinksSection}
-        `;
+      const platformIcon = document.createElement("span");
+      platformIcon.className = "platform-icon";
+      platformIcon.innerHTML = this.getPlatformIcon(this.selectedCommand.platform);
+
+      const platformName = document.createElement("span");
+      platformName.className = "platform-name";
+      platformName.textContent = this.getPlatformName(this.selectedCommand.platform);
+
+      platformInfo.appendChild(platformIcon);
+      platformInfo.appendChild(platformName);
+      headerSection.appendChild(platformInfo);
+    }
+
+    const descriptionEl = document.createElement("div");
+    descriptionEl.className = "command-description";
+    descriptionEl.textContent = this.selectedCommand.description || "";
+
+    commandInfo.appendChild(headerSection);
+    commandInfo.appendChild(descriptionEl);
+
+    if (activeRequires.length || (this.selectedCommand.protocols || []).length) {
+      const badgesRow = document.createElement("div");
+      badgesRow.className = "builder-badges";
+
+      const appendBadge = (className, value) => {
+        const badgeEl = document.createElement("span");
+        badgeEl.className = `badge ${className}`;
+        badgeEl.textContent = value;
+        badgesRow.appendChild(badgeEl);
+      };
+
+      activeRequires.forEach((requires) => appendBadge("badge-requires", requires));
+      (this.selectedCommand.protocols || []).forEach((protocol) => appendBadge("badge-protocol", protocol));
+      commandInfo.appendChild(badgesRow);
+    }
+
+    container.appendChild(commandInfo);
+
+    if (hasVariations) {
+      const variationTabs = document.createElement("div");
+      variationTabs.className = "variation-tabs";
+
+      const defaultTab = document.createElement("button");
+      defaultTab.className = `variation-tab${this.activeVariation === 0 ? " active" : ""}`;
+      defaultTab.dataset.variation = "0";
+      defaultTab.textContent = "Default";
+      variationTabs.appendChild(defaultTab);
+
+      this.selectedCommand.variations.forEach((variation, index) => {
+        const tab = document.createElement("button");
+        tab.className = `variation-tab${this.activeVariation === index + 1 ? " active" : ""}`;
+        tab.dataset.variation = String(index + 1);
+        tab.textContent = variation.label || "";
+        variationTabs.appendChild(tab);
+      });
+
+      container.appendChild(variationTabs);
+    }
+
+    if (placeholders.length > 0) {
+      const parameterSection = document.createElement("div");
+      parameterSection.className = "parameter-section";
+
+      const sectionTitle = document.createElement("div");
+      sectionTitle.className = "section-title";
+      sectionTitle.textContent = "Parameters";
+
+      const parameterGrid = document.createElement("div");
+      parameterGrid.className = "parameter-grid";
+
+      placeholders.forEach((placeholder) => {
+        const parameterGroup = document.createElement("div");
+        parameterGroup.className = "parameter-group";
+
+        const label = document.createElement("label");
+        label.className = "parameter-label";
+        label.textContent = placeholder;
+
+        const dropdownContainer = document.createElement("div");
+        dropdownContainer.className = "dropdown-container";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "parameter-input";
+        input.id = `param-${placeholder}`;
+        input.placeholder = `Enter ${placeholder}...`;
+        input.dataset.placeholder = placeholder;
+        input.value = "";
+
+        const dropdown = document.createElement("div");
+        dropdown.className = "dropdown-list";
+        dropdown.id = `dropdown-${placeholder}`;
+
+        dropdownContainer.appendChild(input);
+        dropdownContainer.appendChild(dropdown);
+        parameterGroup.appendChild(label);
+        parameterGroup.appendChild(dropdownContainer);
+        parameterGrid.appendChild(parameterGroup);
+      });
+
+      parameterSection.appendChild(sectionTitle);
+      parameterSection.appendChild(parameterGrid);
+      container.appendChild(parameterSection);
+    }
+
+    const outputSection = document.createElement("div");
+    outputSection.className = "output-section";
+
+    const outputHeader = document.createElement("div");
+    outputHeader.className = "output-header";
+
+    const outputTitle = document.createElement("span");
+    outputTitle.className = "output-title";
+    outputTitle.textContent = "Generated Command";
+
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "copy-btn";
+    copyBtn.id = "copy-command-btn";
+    copyBtn.textContent = "Copy";
+
+    outputHeader.appendChild(outputTitle);
+    outputHeader.appendChild(copyBtn);
+
+    const commandOutput = document.createElement("div");
+    commandOutput.className = "command-output";
+    commandOutput.id = "command-output";
+    commandOutput.textContent = activeCmd;
+
+    outputSection.appendChild(outputHeader);
+    outputSection.appendChild(commandOutput);
+    container.appendChild(outputSection);
+
+    if (this.selectedCommand.references && this.selectedCommand.references.length > 0) {
+      const referencesSection = document.createElement("div");
+      referencesSection.className = "references-section";
+
+      const referencesTitle = document.createElement("div");
+      referencesTitle.className = "section-title";
+      referencesTitle.textContent = "📚 References & Documentation";
+
+      const referencesList = document.createElement("div");
+      referencesList.className = "references-list";
+
+      this.selectedCommand.references.forEach((ref) => {
+        const safeUrl = this.safeReferenceUrl(ref.url);
+        const referenceEl = document.createElement(safeUrl ? "a" : "span");
+        referenceEl.className = "reference-link";
+        if (safeUrl) {
+          referenceEl.href = safeUrl;
+          referenceEl.target = "_blank";
+          referenceEl.rel = "noopener noreferrer";
+        }
+
+        const referenceTitle = document.createElement("span");
+        referenceTitle.className = "reference-title";
+        referenceTitle.textContent = ref.title || "";
+
+        const externalIcon = document.createElement("span");
+        externalIcon.className = "external-link-icon";
+        externalIcon.textContent = safeUrl ? "↗" : "";
+
+        referenceEl.appendChild(referenceTitle);
+        referenceEl.appendChild(externalIcon);
+        referencesList.appendChild(referenceEl);
+      });
+
+      referencesSection.appendChild(referencesTitle);
+      referencesSection.appendChild(referencesList);
+      container.appendChild(referencesSection);
+    }
+
+    const commandLinksSection = this.createCommandLinksForCommand(this.selectedCommand.id);
+    if (commandLinksSection) {
+      container.appendChild(commandLinksSection);
+    }
 
     this.generateCommand();
     this.setupParameterEventListeners();
@@ -1288,39 +1387,53 @@ class CommandManager {
     });
   }
 
-  // Get command links section HTML for the selected command
-  getCommandLinksForCommand(commandId) {
+  // Build command links section for the selected command
+  createCommandLinksForCommand(commandId) {
     if (!this.commandLinks[commandId] || this.commandLinks[commandId].length === 0) {
-      return '';
+      return null;
     }
 
-    const linkedCommands = this.commandLinks[commandId]
-      .map(linkId => {
-        // Find the command data for this link
-        const linkedCommand = this.findCommandById(linkId);
-        if (!linkedCommand) return null;
+    const section = document.createElement("div");
+    section.className = "command-links-section";
 
-        return `
-          <div class="linked-command" data-command-id="${linkId}">
-            <div class="linked-command-name">${linkedCommand.name}</div>
-            <div class="linked-command-desc">${linkedCommand.description}</div>
-            <div class="linked-command-arrow">→</div>
-          </div>
-        `;
-      })
-      .filter(Boolean)
-      .join('');
+    const title = document.createElement("div");
+    title.className = "section-title";
+    title.textContent = "🔗 Recommended Next Commands";
 
-    if (!linkedCommands) return '';
+    const list = document.createElement("div");
+    list.className = "command-links-list";
 
-    return `
-      <div class="command-links-section">
-        <div class="section-title">🔗 Recommended Next Commands</div>
-        <div class="command-links-list">
-          ${linkedCommands}
-        </div>
-      </div>
-    `;
+    this.commandLinks[commandId].forEach((linkId) => {
+      const linkedCommand = this.findCommandById(linkId);
+      if (!linkedCommand) return;
+
+      const linkedEl = document.createElement("div");
+      linkedEl.className = "linked-command";
+      linkedEl.dataset.commandId = linkId;
+
+      const nameEl = document.createElement("div");
+      nameEl.className = "linked-command-name";
+      nameEl.textContent = linkedCommand.name || "";
+
+      const descEl = document.createElement("div");
+      descEl.className = "linked-command-desc";
+      descEl.textContent = linkedCommand.description || "";
+
+      const arrowEl = document.createElement("div");
+      arrowEl.className = "linked-command-arrow";
+      arrowEl.textContent = "→";
+
+      linkedEl.appendChild(nameEl);
+      linkedEl.appendChild(descEl);
+      linkedEl.appendChild(arrowEl);
+      list.appendChild(linkedEl);
+    });
+
+    if (!list.children.length) return null;
+
+    section.appendChild(title);
+    section.appendChild(list);
+    return section;
   }
 
   // Helper method to find command by ID

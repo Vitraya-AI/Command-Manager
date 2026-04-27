@@ -11,6 +11,7 @@ class FakeElement {
     this.dataset = {};
     this.attributes = {};
     this.className = "";
+    this.id = "";
     this._textContent = "";
     this._innerHTML = "";
   }
@@ -41,14 +42,30 @@ class FakeElement {
 
   get classList() {
     return {
-      add: () => {},
-      remove: () => {},
-      contains: () => false,
+      add: (...classes) => {
+        const current = new Set(this.className.split(/\s+/).filter(Boolean));
+        classes.forEach((className) => current.add(className));
+        this.className = [...current].join(" ");
+      },
+      remove: (...classes) => {
+        const removeSet = new Set(classes);
+        this.className = this.className
+          .split(/\s+/)
+          .filter((className) => className && !removeSet.has(className))
+          .join(" ");
+      },
+      contains: (className) => this.className.split(/\s+/).includes(className),
     };
   }
 
   setAttribute(name, value) {
+    if (name === "id") this.id = String(value);
     this.attributes[name] = String(value);
+  }
+
+  getAttribute(name) {
+    if (name === "id") return this.id;
+    return this.attributes[name] || null;
   }
 
   appendChild(child) {
@@ -56,8 +73,10 @@ class FakeElement {
     return child;
   }
 
-  querySelectorAll() {
-    return [];
+  addEventListener() {}
+
+  querySelectorAll(selector) {
+    return findAll(this, selector);
   }
 
   closest() {
@@ -67,10 +86,11 @@ class FakeElement {
   get outerHTML() {
     const attrs = [
       this.className ? `class="${escapeHtml(this.className)}"` : "",
+      this.id ? `id="${escapeHtml(this.id)}"` : "",
       ...Object.entries(this.dataset).map(
         ([key, value]) => `data-${dashCase(key)}="${escapeHtml(String(value))}"`
       ),
-      ...Object.entries(this.attributes).map(
+      ...Object.entries(this.attributes).filter(([key]) => key !== "id").map(
         ([key, value]) => `${key}="${escapeHtml(String(value))}"`
       ),
     ].filter(Boolean).join(" ");
@@ -92,15 +112,53 @@ function dashCase(value) {
   return value.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
 }
 
+function findAll(root, selector) {
+  const results = [];
+  const matches = (el) => {
+    if (selector.startsWith(".")) {
+      return el.className.split(/\s+/).includes(selector.slice(1));
+    }
+    if (selector.startsWith("#")) {
+      return el.id === selector.slice(1);
+    }
+    return el.tagName.toLowerCase() === selector.toLowerCase();
+  };
+  const visit = (el) => {
+    if (matches(el)) results.push(el);
+    el.children.forEach(visit);
+  };
+  root.children.forEach(visit);
+  return results;
+}
+
+function findById(root, id) {
+  if (root.id === id) return root;
+  for (const child of root.children) {
+    const found = findById(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
 const elements = {
   "command-list": new FakeElement("div"),
   "command-count": new FakeElement("div"),
+  "builder-content": new FakeElement("div"),
 };
 
 const document = {
   addEventListener: () => {},
   createElement: (tagName) => new FakeElement(tagName),
-  getElementById: (id) => elements[id] || null,
+  getElementById: (id) => {
+    if (elements[id]) return elements[id];
+    for (const root of Object.values(elements)) {
+      const found = findById(root, id);
+      if (found) return found;
+    }
+    return null;
+  },
+  querySelectorAll: (selector) =>
+    Object.values(elements).flatMap((root) => findAll(root, selector)),
 };
 
 const appPath = path.join(__dirname, "..", "js", "app.js");
@@ -114,6 +172,7 @@ const context = {
   history: { replaceState: () => {} },
   COMMAND_DATA: { categories: {}, commands: [] },
   COMMAND_LINKS: {},
+  URL,
   setTimeout,
   clearTimeout,
 };
@@ -146,3 +205,55 @@ if (!rendered.includes("&lt;img")) {
 }
 
 console.log("OK - renderCommands treats catalog fields as text.");
+
+elements["builder-content"].children = [];
+elements["builder-content"].innerHTML = "";
+
+context.COMMAND_DATA.commands = [
+  {
+    id: "linked-command",
+    name: "<img src=x onerror=alert(8)>",
+    description: "<img src=x onerror=alert(9)>",
+  },
+];
+
+manager.selectedCommand = {
+  id: "hostile-builder-command",
+  name: "<img src=x onerror=alert(4)>",
+  command: "nxc smb <target>",
+  description: "<img src=x onerror=alert(5)>",
+  platform: "linux",
+  requires: ["password"],
+  protocols: ["smb"],
+  references: [
+    {
+      title: "<img src=x onerror=alert(6)>",
+      url: "javascript:alert(7)",
+    },
+  ],
+  variations: [
+    {
+      label: "<img src=x onerror=alert(10)>",
+      requires: "hash",
+      command: "nxc smb <target> -H <hash>",
+    },
+  ],
+};
+manager.activeVariation = 0;
+manager.commandLinks = { "hostile-builder-command": ["linked-command"] };
+manager.targetContext = {};
+manager.customAssetTypes = [];
+manager.lists = {};
+
+manager.renderCommandBuilder();
+
+const builderRendered = elements["builder-content"].innerHTML;
+if (/<img|javascript:/i.test(builderRendered)) {
+  throw new Error(`rendered command builder contains executable markup: ${builderRendered}`);
+}
+
+if (!builderRendered.includes("&lt;img")) {
+  throw new Error(`hostile builder text was not preserved as escaped text: ${builderRendered}`);
+}
+
+console.log("OK - renderCommandBuilder treats catalog fields as text.");

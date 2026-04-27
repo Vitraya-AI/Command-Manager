@@ -46,13 +46,13 @@ Status: remediated. `renderCommands()` now creates DOM nodes directly and `scrip
 
 ### P1: Eliminate Catalog XSS in Command Builder Rendering
 
-- [ ] Refactor `renderCommandBuilder()` in `js/app.js` away from interpolating catalog data into `innerHTML`.
-- [ ] Safely render command title, description, variation labels, placeholder labels, output command, badges, references, and command links.
-- [ ] Restrict reference URLs to safe schemes, preferably `http:` and `https:`.
-- [ ] Add `rel="noopener noreferrer"` to external reference links.
-- [ ] Safely render linked command names and descriptions in `getCommandLinksForCommand()`.
+- [x] Refactor `renderCommandBuilder()` in `js/app.js` away from interpolating catalog data into `innerHTML`.
+- [x] Safely render command title, description, variation labels, placeholder labels, output command, badges, references, and command links.
+- [x] Restrict reference URLs to safe schemes, preferably `http:` and `https:`.
+- [x] Add `rel="noopener noreferrer"` to external reference links.
+- [x] Safely render linked command names and descriptions in `getCommandLinksForCommand()`.
 
-Context: selecting a crafted command can inject markup through builder fields, references, placeholder names, or linked-command metadata.
+Status: remediated. `renderCommandBuilder()` and the command-link section now create DOM nodes directly, reference URLs are limited to `http:` and `https:`, and the render safety regression covers hostile builder fields plus unsafe reference URLs.
 
 ### P2: Make Builds Fail on Any Invalid Command File
 
