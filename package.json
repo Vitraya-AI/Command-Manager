@@ -5,6 +5,8 @@
   "description": "A searchable, copy-pasteable library of pentesting commands focused on Active Directory.",
   "scripts": {
     "build": "node build-commands.js",
+    "test": "npm run test:render-safety",
+    "test:render-safety": "node scripts/test-render-commands-safety.js",
     "validate": "node validate-commands.js"
   },
   "devDependencies": {

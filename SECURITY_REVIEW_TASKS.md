@@ -16,6 +16,7 @@ Before adding new use-case-specific features, the main stability and security go
 ## Current Verification Baseline
 
 - [x] `npm ci` succeeds from the committed lockfile.
+- [x] `npm test` succeeds: render safety regression passes.
 - [x] `npm run validate` succeeds: 285 commands validated.
 - [x] `npm run build` succeeds and produces no tracked diff.
 - [x] `npm audit --audit-level=moderate` reports 0 vulnerabilities.
@@ -37,11 +38,11 @@ Status: remediated. `index.html` no longer loads `//gc.zgo.at/count.js`, no refe
 
 ### P1: Eliminate Catalog XSS in Command List Rendering
 
-- [ ] Refactor `renderCommands()` in `js/app.js` to build DOM nodes with `createElement`, `textContent`, and safe `setAttribute`.
-- [ ] Escape or safely assign command names, command previews, tags, requires badges, protocol badges, titles, and data attributes.
-- [ ] Add a small regression test or browser smoke check with a deliberately hostile command fixture.
+- [x] Refactor `renderCommands()` in `js/app.js` to build DOM nodes with `createElement`, `textContent`, and safe `setAttribute`.
+- [x] Escape or safely assign command names, command previews, tags, requires badges, protocol badges, titles, and data attributes.
+- [x] Add a small regression test or browser smoke check with a deliberately hostile command fixture.
 
-Context: `renderCommands()` currently interpolates command catalog fields into `innerHTML`. A crafted command JSON entry can execute markup when the list renders.
+Status: remediated. `renderCommands()` now creates DOM nodes directly and `scripts/test-render-commands-safety.js` covers hostile command names, command text, and tags.
 
 ### P1: Eliminate Catalog XSS in Command Builder Rendering
 

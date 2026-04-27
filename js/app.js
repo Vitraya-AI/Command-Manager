@@ -1025,39 +1025,68 @@ class CommandManager {
       const isFavorite = this.favorites.has(command.id);
       const starIcon = isFavorite ? "⭐" : "☆";
 
+      const headerEl = document.createElement("div");
+      headerEl.className = "command-header";
+
+      const nameEl = document.createElement("div");
+      nameEl.className = "command-name";
+      nameEl.textContent = command.name || "";
+
+      if (command.variations && command.variations.length > 0) {
+        const variationCountEl = document.createElement("span");
+        variationCountEl.className = "variation-count";
+        variationCountEl.textContent = String(command.variations.length + 1);
+        nameEl.appendChild(variationCountEl);
+      }
+
+      const favoriteBtn = document.createElement("button");
+      favoriteBtn.className = "favorite-btn";
+      favoriteBtn.dataset.commandId = command.id;
+      favoriteBtn.title = isFavorite ? "Remove from favorites" : "Add to favorites";
+      favoriteBtn.setAttribute("aria-label", favoriteBtn.title);
+      favoriteBtn.setAttribute("aria-pressed", String(isFavorite));
+      favoriteBtn.textContent = starIcon;
+
+      headerEl.appendChild(nameEl);
+      headerEl.appendChild(favoriteBtn);
+
+      const previewEl = document.createElement("div");
+      previewEl.className = "command-preview";
+      previewEl.title = command.command || "";
+      previewEl.textContent = command.command || "";
+
+      const badgesEl = document.createElement("div");
+      badgesEl.className = "command-badges";
+
+      const appendBadge = (className, value) => {
+        const badgeEl = document.createElement("span");
+        badgeEl.className = `badge ${className}`;
+        badgeEl.textContent = value;
+        badgesEl.appendChild(badgeEl);
+      };
+
       // Collect all requires values (base + variations)
       const allRequires = new Set(command.requires || []);
       if (command.variations) {
         command.variations.forEach((v) => { if (v.requires) allRequires.add(v.requires); });
       }
-      const requiresBadges = [...allRequires]
-        .map((r) => `<span class="badge badge-requires">${r}</span>`)
-        .join("");
-      const protocolBadges = (command.protocols || [])
-        .map((p) => `<span class="badge badge-protocol">${p}</span>`)
-        .join("");
 
-      commandEl.innerHTML = `
-                <div class="command-header">
-                    <div class="command-name">${command.name}${
-                      command.variations && command.variations.length > 0
-                        ? ` <span class="variation-count">${command.variations.length + 1}</span>`
-                        : ""
-                    }</div>
-                    <button class="favorite-btn" data-command-id="${command.id}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" aria-pressed="${isFavorite}">
-                        ${starIcon}
-                    </button>
-                </div>
-                <div class="command-preview" title="${command.command.replace(/"/g, '&quot;')}">${command.command}</div>
-                <div class="command-badges">
-                    ${requiresBadges}${protocolBadges}
-                </div>
-                <div class="command-tags">
-                    ${command.tags
-                      .map((tag) => `<span class="tag">${tag}</span>`)
-                      .join("")}
-                </div>
-            `;
+      [...allRequires].forEach((requires) => appendBadge("badge-requires", requires));
+      (command.protocols || []).forEach((protocol) => appendBadge("badge-protocol", protocol));
+
+      const tagsEl = document.createElement("div");
+      tagsEl.className = "command-tags";
+      (command.tags || []).forEach((tag) => {
+        const tagEl = document.createElement("span");
+        tagEl.className = "tag";
+        tagEl.textContent = tag;
+        tagsEl.appendChild(tagEl);
+      });
+
+      commandEl.appendChild(headerEl);
+      commandEl.appendChild(previewEl);
+      commandEl.appendChild(badgesEl);
+      commandEl.appendChild(tagsEl);
 
       container.appendChild(commandEl);
     });
